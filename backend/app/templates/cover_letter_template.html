@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cover Letter Template</title>
+    <style>
+        body { font-family: 'Helvetica', sans-serif; line-height: 1.6; }
+        .date { margin-bottom: 20px; }
+        .recipient { margin-bottom: 20px; }
+        .body-text { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="date">{{ date }}</div>
+    <div class="recipient">
+        <p>Hiring Manager</p>
+        <p>{{ company_name }}</p>
+    </div>
+    <div class="body-text">
+        <p>Dear Hiring Team,</p>
+        <p>{{ cover_letter_body }}</p>
+        <p>Sincerely,</p>
+        <p>{{ user.name }}</p>
+    </div>
+</body>
+</html>

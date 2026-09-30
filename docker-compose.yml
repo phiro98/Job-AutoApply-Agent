@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: autoapply_db
+    restart: always
+    environment:
+      POSTGRES_USER: autoapply
+      POSTGRES_PASSWORD: autoapply_password
+      POSTGRES_DB: autoapply_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autoapply_backend
+    restart: always
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./backend:/app  # Live reload for development
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to point to the docker db service
+      - DATABASE_URL=postgresql://autoapply:autoapply_password@db:5432/autoapply_db
+    depends_on:
+      - db
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: autoapply_frontend
+    restart: always
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevent host node_modules from overwriting container node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8002/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
