@@ -12,8 +12,8 @@ class EmailDispatch(BaseModel):
 
 @router.post("/send")
 async def send_email(dispatch: EmailDispatch):
-    \"\"\"
+    """
     Connects to Gmail API and transmits the email with attachments.
-    \"\"\"
+    """
     # TODO: Connect to gmail_service
     return {"message": "Email dispatched successfully"}

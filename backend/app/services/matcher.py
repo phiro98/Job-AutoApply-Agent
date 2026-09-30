@@ -29,7 +29,7 @@ def analyze_gap(ground_truth_cv: dict, jd_text: str) -> dict:
     """
     
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-3.8-flash')
         response = model.generate_content(prompt)
         
         json_str = response.text.replace('```json', '').replace('```', '').strip()

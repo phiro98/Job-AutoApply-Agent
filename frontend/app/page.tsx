@@ -3,16 +3,43 @@
 import React, { useState, useRef } from 'react';
 import ChatInterface from '@/components/ChatInterface';
 import PdfViewer from '@/components/PdfViewer';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Loader2 } from 'lucide-react';
 
 export default function Home() {
   const [isUploaded, setIsUploaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [cvData, setCvData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      // TODO: Actual API call to backend /api/v1/cv/upload goes here
-      setIsUploaded(true);
+      const file = e.target.files[0];
+      setIsLoading(true);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cv/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Parsed CV from Gemini:", data.schema);
+          setCvData(data.schema);
+          setIsUploaded(true);
+        } else {
+          console.error("Upload failed");
+          alert("Failed to parse CV. Ensure Gemini API key is valid.");
+        }
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Network error. Is the Python backend running?");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -27,20 +54,35 @@ export default function Home() {
             Please upload your master CV to initialize the agent.
           </p>
           
-          <div 
-            className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-900 transition-all flex flex-col items-center"
-            onClick={() => fileInputRef.current?.click()}
+          <label 
+            htmlFor="cv-upload"
+            className={`border-2 border-dashed rounded-xl p-12 transition-all flex flex-col items-center block w-full
+              ${isLoading 
+                ? 'border-blue-400 bg-blue-50 dark:bg-slate-900 cursor-wait' 
+                : 'border-slate-300 dark:border-slate-700 cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-900'
+              }`}
           >
-            <UploadCloud size={48} className="text-blue-500 mb-4" />
-            <span className="font-medium text-slate-700 dark:text-slate-300">Click to browse files</span>
-            <span className="text-xs text-slate-500 mt-2">PDF or DOCX</span>
-          </div>
+            {isLoading ? (
+              <>
+                <Loader2 size={48} className="text-blue-500 mb-4 animate-spin" />
+                <span className="font-medium text-slate-700 dark:text-slate-300">Parsing with Gemini AI...</span>
+                <span className="text-xs text-slate-500 mt-2">Extracting skills & history</span>
+              </>
+            ) : (
+              <>
+                <UploadCloud size={48} className="text-blue-500 mb-4" />
+                <span className="font-medium text-slate-700 dark:text-slate-300">Click to browse files</span>
+                <span className="text-xs text-slate-500 mt-2">PDF or DOCX</span>
+              </>
+            )}
+          </label>
           <input 
+            id="cv-upload"
             type="file" 
-            ref={fileInputRef} 
             className="hidden" 
             accept=".pdf,.docx"
             onChange={handleUpload}
+            disabled={isLoading}
           />
         </div>
       </main>
@@ -58,7 +100,7 @@ export default function Home() {
           <p className="text-sm text-slate-500">Collaborative CV & Cover Letter Tailoring</p>
         </div>
         <div className="flex-grow overflow-hidden">
-          <ChatInterface />
+          <ChatInterface cvData={cvData} setCvData={setCvData} />
         </div>
       </div>
 
@@ -72,7 +114,7 @@ export default function Home() {
           </div>
         </div>
         <div className="flex-grow p-6 overflow-auto flex justify-center items-start">
-          <PdfViewer />
+          <PdfViewer cvData={cvData} />
         </div>
       </div>
     </main>

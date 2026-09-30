@@ -3,27 +3,68 @@
 import React, { useState } from 'react';
 import { Send, Upload, FileText, CheckCircle } from 'lucide-react';
 
-export default function ChatInterface() {
+export default function ChatInterface({ cvData, setCvData }: { cvData: any, setCvData: any }) {
   const [messages, setMessages] = useState([
     { id: 1, role: 'system', text: "CV successfully parsed! Your ground truth profile is set. Please paste a Job Description to begin tailoring." }
   ]);
   const [input, setInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isProcessing) return;
     
     const newMsg = { id: Date.now(), role: 'user', text: input };
-    setMessages([...messages, newMsg]);
+    setMessages(prev => [...prev, newMsg]);
     setInput('');
+    setIsProcessing(true);
     
-    // Stub response
-    setTimeout(() => {
-      setMessages(prev => [...prev, { 
-        id: Date.now() + 1, 
-        role: 'system', 
-        text: "I received your message. I am ready to process your JD when you paste it." 
-      }]);
-    }, 1000);
+    try {
+      // Hit the JD analyzer
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/jd/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jd_text: input, ground_truth_cv: cvData })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.analysis) {
+        // Construct reply message
+        const reply = `Analysis Complete! Match Score: ${data.analysis.match_score}%\n\n` +
+                      `Missing Skills: ${data.analysis.missing_skills?.join(', ') || 'None'}\n\n` +
+                      `I've proposed some tailored bullets for your CV based on this JD. Shall I apply them?`;
+                      
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: reply }]);
+        
+        // For demonstration, let's automatically append a skill if there are missing skills
+        // and modify a bullet if proposed edits exist, to show the PDF updating.
+        let updatedCV = { ...cvData };
+        if (data.analysis.missing_skills && data.analysis.missing_skills.length > 0) {
+          updatedCV.skills = [...(updatedCV.skills || []), ...data.analysis.missing_skills];
+        }
+        if (data.analysis.proposed_edits && data.analysis.proposed_edits.length > 0) {
+          const edit = data.analysis.proposed_edits[0];
+          // Simple string replace on the first job's bullets just to show it updating
+          if (updatedCV.work_history && updatedCV.work_history[0] && updatedCV.work_history[0].bullets) {
+            updatedCV.work_history[0].bullets = updatedCV.work_history[0].bullets.map((b: string) => 
+               b === edit.original_bullet ? edit.tailored_bullet : b
+            );
+            // If the original bullet wasn't found exactly, just append the tailored one for visual feedback
+            if (!updatedCV.work_history[0].bullets.includes(edit.tailored_bullet)) {
+              updatedCV.work_history[0].bullets.push(edit.tailored_bullet);
+            }
+          }
+        }
+        
+        setCvData(updatedCV);
+      } else {
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Sorry, I couldn't process that JD." }]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Network error occurred." }]);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

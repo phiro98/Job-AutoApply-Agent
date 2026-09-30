@@ -36,7 +36,7 @@ def parse_cv(file_path: str) -> dict:
     """
     
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-3.8-flash')
         response = model.generate_content(prompt)
         
         # Strip potential markdown formatting
