@@ -1,27 +1,36 @@
 import pdfplumber
 import json
-import google.generativeai as genai
+import re
+from groq import Groq
 from app.core.config import settings
 
 def extract_text_from_pdf(file_path: str) -> str:
-    """Extracts raw text from a PDF file using pdfplumber."""
-    text = ""
+    """Extracts raw text from a PDF file using pdfplumber, and cleans it."""
+    extracted_pages = []
     try:
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+                text = page.extract_text() or ""
+                extracted_pages.append(text)
     except Exception as e:
         print(f"Error reading PDF: {e}")
-    return text
+        return ""
+        
+    full_text = "\n".join(extracted_pages)
+    
+    # Collapse excessive newlines and whitespace
+    full_text = re.sub(r'[ \t]+', ' ', full_text)
+    full_text = re.sub(r'\n{3,}', '\n\n', full_text).strip()
+    
+    # Safety cap: A realistic CV never exceeds ~15,000 characters
+    return full_text[:15000]
 
 def parse_cv(file_path: str) -> dict:
     """
-    Extracts text from the CV document and structures it into a JSON schema via Gemini.
+    Extracts text from the CV document and structures it into a JSON schema via Groq.
     """
     raw_text = extract_text_from_pdf(file_path)
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+    client = Groq(api_key=settings.GROQ_API_KEY)
     
     prompt = f"""
     Extract the following resume text into a structured JSON format. 
@@ -36,14 +45,34 @@ def parse_cv(file_path: str) -> dict:
     """
     
     try:
-        model = genai.GenerativeModel('gemini-3.8-flash')
-        response = model.generate_content(prompt)
+        available_models = [m.id for m in client.models.list().data]
+        target_models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it", "llama3-70b-8192"]
+        selected_model = next((m for m in target_models if m in available_models), available_models[0])
         
-        # Strip potential markdown formatting
-        json_str = response.text.replace('```json', '').replace('```', '').strip()
+        print(f"==== GROQ API LOG ====")
+        print(f"Available models: {available_models}")
+        print(f"Selected model: {selected_model}")
+        print(f"Payload char length: {len(prompt)}")
+        print(f"Estimated tokens: {len(prompt) // 4}")
+        print(f"Payload preview: {prompt[:200]}...")
+        print(f"======================")
+        
+        response = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            model=selected_model,
+            temperature=0.0,
+            max_tokens=4096
+        )
+        
+        json_str = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
         structured_data = json.loads(json_str)
         return structured_data
     except Exception as e:
-        print(f"Error parsing CV with Gemini: {e}")
+        print(f"Error parsing CV with Groq: {e}")
         return {} # Fallback
 

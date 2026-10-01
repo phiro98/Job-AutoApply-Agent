@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AutoApply Agent"
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     SECRET_KEY: str = "super_secret_key"
