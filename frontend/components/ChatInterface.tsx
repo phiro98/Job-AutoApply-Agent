@@ -9,9 +9,24 @@ export default function ChatInterface({ cvData, setCvData }: { cvData: any, setC
   ]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  type Task = 
+    | { type: 'missing_skill', skill: string }
+    | { type: 'proposed_edit', original_bullet: string, tailored_bullet: string }
+    | { type: 'confirm_skill_bullet', skill: string, bullet: string };
+
   const [hasJd, setHasJd] = useState(false);
-  const [pendingEdits, setPendingEdits] = useState<any[] | null>(null);
-  const [missingSkills, setMissingSkills] = useState<string[] | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentTaskIndex, setCurrentItemIndex] = useState(0);
+
+  const presentTask = (task: Task) => {
+    if (task.type === 'missing_skill') {
+      setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'system', text: `You are missing the skill: **${task.skill}**. Do you have experience with this? (If yes, please provide context. If no, just say 'no')` }]);
+    } else if (task.type === 'proposed_edit') {
+      setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'system', text: `Proposed edit to align with JD:\n\nInstead of: "${task.original_bullet}"\nChange to: "${task.tailored_bullet}"\n\nShould I apply this? (Yes/No)` }]);
+    } else if (task.type === 'confirm_skill_bullet') {
+      setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'system', text: `Proposed Bullet: "${task.bullet}"\n\nShould I apply this? (Yes/No)` }]);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isProcessing) return;
@@ -38,57 +53,90 @@ export default function ChatInterface({ cvData, setCvData }: { cvData: any, setC
           const edits = data.analysis.proposed_edits || [];
           
           setHasJd(true);
-          setPendingEdits(edits.length > 0 ? edits : null);
-          setMissingSkills(mSkills.length > 0 ? mSkills : null);
           
-          let reply = `Analysis Complete! Match Score: ${matchScore}%\n\n`;
-          if (mSkills.length > 0) {
-            reply += `Missing Skills: ${mSkills.join(', ')}\n\n`;
-          }
+          const newTasks: Task[] = [
+            ...mSkills.map((s: string) => ({ type: 'missing_skill', skill: s } as Task)),
+            ...edits.map((e: any) => ({ type: 'proposed_edit', original_bullet: e.original_bullet, tailored_bullet: e.tailored_bullet } as Task))
+          ];
+          setTasks(newTasks);
+          setCurrentItemIndex(0);
           
-          if (edits.length > 0) {
-            reply += `Here are the proposed tailored bullets based on the Job Description:\n\n`;
-            reply += edits.map((e: any, i: number) => `${i+1}. Instead of: "${e.original_bullet}"\n   Change to: "${e.tailored_bullet}"`).join('\n\n');
-            reply += `\n\nShould I 'apply' these updates to your CV?`;
-          } else {
-            reply += `No specific bullet edits were proposed by the model for this JD.`;
-          }
-                        
+          let reply = `Analysis Complete! Match Score: ${matchScore}%\n`;
           setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: reply }]);
+          
+          if (newTasks.length > 0) {
+            setTimeout(() => presentTask(newTasks[0]), 100);
+          } else {
+            setMessages(prev => [...prev, { id: Date.now() + 2, role: 'system', text: `Your CV is a great match! No edits proposed.` }]);
+          }
         } else {
           setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Sorry, I couldn't process that JD." }]);
         }
-      } else if (pendingEdits || missingSkills) {
-        // State 3: We have pending edits and user is responding
+      } else if (tasks.length > 0 && currentTaskIndex < tasks.length) {
+        // State 2: Processing tasks one by one
+        const currentTask = tasks[currentTaskIndex];
         const userText = input.toLowerCase();
         
-        if (userText.includes('apply') || userText.includes('yes')) {
-          // Apply edits to CV
-          let updatedCV = { ...cvData };
-          
-          if (missingSkills) {
-            updatedCV.skills = [...(updatedCV.skills || []), ...missingSkills];
+        if (currentTask.type === 'missing_skill') {
+          // Call /refine_bullet
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/refine_bullet`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skill: currentTask.skill, user_input: input, cv_data: cvData })
+          });
+          const chatData = await res.json();
+          if (chatData.action === 'skip') {
+            setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: chatData.message }]);
+            
+            // Move to next task
+            const nextIndex = currentTaskIndex + 1;
+            setCurrentItemIndex(nextIndex);
+            if (nextIndex < tasks.length) {
+              setTimeout(() => presentTask(tasks[nextIndex]), 500);
+            } else {
+              setTimeout(() => setMessages(prev => [...prev, { id: Date.now() + 2, role: 'system', text: "All updates reviewed!" }]), 500);
+            }
+          } else if (chatData.action === 'propose_bullet') {
+            // Replace the current task with confirm_skill_bullet
+            const newTasks = [...tasks];
+            newTasks[currentTaskIndex] = { type: 'confirm_skill_bullet', skill: currentTask.skill, bullet: chatData.tailored_bullet };
+            setTasks(newTasks);
+            
+            setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: `${chatData.message}\n\nProposed Bullet: "${chatData.tailored_bullet}"\n\nShould I apply this? (Yes/No)` }]);
           }
-          
-          if (pendingEdits && updatedCV.work_history && updatedCV.work_history[0]) {
-            pendingEdits.forEach((edit: any) => {
-                 updatedCV.work_history[0].bullets = updatedCV.work_history[0].bullets.map((b: string) => 
-                    b === edit.original_bullet ? edit.tailored_bullet : b
-                 );
-                 if (!updatedCV.work_history[0].bullets.includes(edit.tailored_bullet)) {
-                     updatedCV.work_history[0].bullets.push(edit.tailored_bullet);
-                 }
-            });
-          }
-          
-          setCvData(updatedCV);
-          setPendingEdits(null);
-          setMissingSkills(null);
-          
-          setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Done! I've updated your CV with the tailored bullets and missing skills. Check the live preview on the right!" }]);
         } 
-        else {
-          setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Just say 'apply' when you are ready to update your CV with these changes." }]);
+        else if (currentTask.type === 'proposed_edit' || currentTask.type === 'confirm_skill_bullet') {
+          if (userText.includes('yes') || userText.includes('apply')) {
+            // Apply edit to CV
+            let updatedCV = { ...cvData };
+            
+            if (currentTask.type === 'confirm_skill_bullet') {
+               updatedCV.skills = [...(updatedCV.skills || []), currentTask.skill];
+               if (updatedCV.work_history && updatedCV.work_history[0]) {
+                 updatedCV.work_history[0].bullets.push(currentTask.bullet);
+               }
+            } else if (currentTask.type === 'proposed_edit') {
+               if (updatedCV.work_history && updatedCV.work_history[0]) {
+                 updatedCV.work_history[0].bullets = updatedCV.work_history[0].bullets.map((b: string) => 
+                    b === currentTask.original_bullet ? currentTask.tailored_bullet : b
+                 );
+               }
+            }
+            
+            setCvData(updatedCV);
+            setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Applied!" }]);
+          } else {
+            setMessages(prev => [...prev, { id: Date.now() + 1, role: 'system', text: "Skipped." }]);
+          }
+          
+          // Move to next task
+          const nextIndex = currentTaskIndex + 1;
+          setCurrentItemIndex(nextIndex);
+          if (nextIndex < tasks.length) {
+            setTimeout(() => presentTask(tasks[nextIndex]), 500);
+          } else {
+            setTimeout(() => setMessages(prev => [...prev, { id: Date.now() + 2, role: 'system', text: "All updates reviewed! Your CV is fully tailored." }]), 500);
+          }
         }
       } else {
         // State 3: General chat placeholder

@@ -30,7 +30,7 @@ def analyze_gap(ground_truth_cv: dict, jd_text: str) -> dict:
     
     try:
         available_models = [m.id for m in client.models.list().data]
-        target_models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it", "llama3-70b-8192"]
+        target_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it", "llama3-70b-8192"]
         selected_model = next((m for m in target_models if m in available_models), available_models[0])
         
         print(f"==== GROQ MATCH LOG ====")
@@ -49,7 +49,7 @@ def analyze_gap(ground_truth_cv: dict, jd_text: str) -> dict:
             ],
             model=selected_model,
             temperature=0.0,
-            max_tokens=4096
+            max_tokens=4000
         )
         
         json_str = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()

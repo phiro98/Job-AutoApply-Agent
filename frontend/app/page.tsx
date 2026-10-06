@@ -43,52 +43,6 @@ export default function Home() {
     }
   };
 
-  if (!isUploaded) {
-    return (
-      <main className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-950 p-10 rounded-2xl shadow-xl max-w-lg w-full text-center border border-slate-200 dark:border-slate-800">
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600 mb-4">
-            AutoApply Agent
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mb-8">
-            Please upload your master CV to initialize the agent.
-          </p>
-          
-          <label 
-            htmlFor="cv-upload"
-            className={`border-2 border-dashed rounded-xl p-12 transition-all flex flex-col items-center block w-full
-              ${isLoading 
-                ? 'border-blue-400 bg-blue-50 dark:bg-slate-900 cursor-wait' 
-                : 'border-slate-300 dark:border-slate-700 cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-900'
-              }`}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={48} className="text-blue-500 mb-4 animate-spin" />
-                <span className="font-medium text-slate-700 dark:text-slate-300">Parsing with Gemini AI...</span>
-                <span className="text-xs text-slate-500 mt-2">Extracting skills & history</span>
-              </>
-            ) : (
-              <>
-                <UploadCloud size={48} className="text-blue-500 mb-4" />
-                <span className="font-medium text-slate-700 dark:text-slate-300">Click to browse files</span>
-                <span className="text-xs text-slate-500 mt-2">PDF or DOCX</span>
-              </>
-            )}
-          </label>
-          <input 
-            id="cv-upload"
-            type="file" 
-            className="hidden" 
-            accept=".pdf,.docx"
-            onChange={handleUpload}
-            disabled={isLoading}
-          />
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
       {/* Left panel: Chat Interface */}
@@ -114,7 +68,44 @@ export default function Home() {
           </div>
         </div>
         <div className="flex-grow p-6 overflow-auto flex justify-center items-start">
-          <PdfViewer cvData={cvData} />
+          {!isUploaded ? (
+            <div className="bg-white dark:bg-slate-950 p-10 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 max-w-md w-full text-center mt-10">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Upload Master CV</h3>
+              <p className="text-sm text-slate-500 mb-6">PDF or DOCX format</p>
+              
+              <label 
+                htmlFor="cv-upload"
+                className={`border-2 border-dashed rounded-xl p-8 transition-all flex flex-col items-center cursor-pointer w-full
+                  ${isLoading 
+                    ? 'border-blue-400 bg-blue-50 dark:bg-slate-900 cursor-wait' 
+                    : 'border-slate-300 dark:border-slate-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-slate-900'
+                  }`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={32} className="text-blue-500 mb-3 animate-spin" />
+                    <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">Parsing with AI...</span>
+                    <span className="text-xs text-slate-500 mt-2">Extracting skills & history</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud size={32} className="text-blue-500 mb-3" />
+                    <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">Click to upload</span>
+                  </>
+                )}
+              </label>
+              <input 
+                id="cv-upload"
+                type="file" 
+                className="hidden" 
+                accept=".pdf,.docx"
+                onChange={handleUpload}
+                disabled={isLoading}
+              />
+            </div>
+          ) : (
+            <PdfViewer cvData={cvData} />
+          )}
         </div>
       </div>
     </main>
