@@ -1,9 +1,37 @@
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Response
+from pydantic import BaseModel
+from weasyprint import HTML
 from app.services.parser import parse_cv
 
 router = APIRouter()
+
+class PdfDownloadRequest(BaseModel):
+    html: str
+    filename: str = "CV.pdf"
+
+@router.post("/download_pdf")
+async def download_cv_pdf(data: PdfDownloadRequest):
+    """
+    Directly converts HTML into an ATS-friendly PDF file and streams it for browser download.
+    """
+    try:
+        pdf_bytes = HTML(string=data.html).write_pdf()
+        safe_filename = data.filename if data.filename.endswith(".pdf") else f"{data.filename}.pdf"
+        safe_filename = safe_filename.replace('"', '').replace('\n', '')
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        print(f"Error generating PDF in WeasyPrint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
 
 @router.post("/upload")
 async def upload_baseline_cv(file: UploadFile = File(...)):

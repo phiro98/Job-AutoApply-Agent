@@ -44,6 +44,7 @@ services:
       - /app/node_modules # Prevent host node_modules from overwriting container node_modules
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8002/api/v1
+      - WATCHPACK_POLLING=true
     depends_on:
       - backend
 

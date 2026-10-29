@@ -39,7 +39,7 @@ def parse_cv(file_path: str) -> dict:
     "summary" (string containing a professional summary or objective),
     "work_history" (array of objects with company, title, dates, bullets array), 
     "education" (array of objects with degree_or_course, institution, year, details_array),
-    "skills" (array of strings),
+    "skills" (array of objects with category and items array of strings),
     "certifications" (array of strings).
     Return ONLY valid JSON. Do not include markdown formatting like ```json.
     

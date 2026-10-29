@@ -3,12 +3,19 @@
 import React, { useState, useRef } from 'react';
 import ChatInterface from '@/components/ChatInterface';
 import PdfViewer from '@/components/PdfViewer';
+import CoverLetterViewer from '@/components/CoverLetterViewer';
 import { UploadCloud, Loader2 } from 'lucide-react';
 
 export default function Home() {
   const [isUploaded, setIsUploaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cvData, setCvData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'cv' | 'cover_letter'>('cv');
+  const [coverLetterData, setCoverLetterData] = useState<{
+    text: string;
+    company_name?: string;
+    job_title?: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,7 +61,14 @@ export default function Home() {
           <p className="text-sm text-slate-500">Collaborative CV & Cover Letter Tailoring</p>
         </div>
         <div className="flex-grow overflow-hidden">
-          <ChatInterface cvData={cvData} setCvData={setCvData} />
+          <ChatInterface 
+            cvData={cvData} 
+            setCvData={setCvData} 
+            coverLetterData={coverLetterData}
+            setCoverLetterData={setCoverLetterData}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
         </div>
       </div>
 
@@ -62,9 +76,30 @@ export default function Home() {
       <div className="w-1/2 h-full flex flex-col bg-slate-100 dark:bg-slate-800/50">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-900">
           <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Document Preview</h2>
-          <div className="space-x-2">
-            <button className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors">CV</button>
-            <button className="px-3 py-1 text-sm bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors">Cover Letter</button>
+          <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button 
+              onClick={() => setActiveTab('cv')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                activeTab === 'cv' 
+                  ? 'bg-white dark:bg-slate-950 text-blue-600 dark:text-blue-400 shadow-sm' 
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              CV
+            </button>
+            <button 
+              onClick={() => setActiveTab('cover_letter')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                activeTab === 'cover_letter' 
+                  ? 'bg-white dark:bg-slate-950 text-blue-600 dark:text-blue-400 shadow-sm' 
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              <span>Cover Letter</span>
+              {coverLetterData && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              )}
+            </button>
           </div>
         </div>
         <div className="flex-grow p-6 overflow-auto flex justify-center items-start">
@@ -100,11 +135,22 @@ export default function Home() {
                 className="hidden" 
                 accept=".pdf,.docx"
                 onChange={handleUpload}
+                onClick={(e) => { e.currentTarget.value = ''; }}
                 disabled={isLoading}
               />
             </div>
-          ) : (
+          ) : activeTab === 'cv' ? (
             <PdfViewer cvData={cvData} />
+          ) : (
+            <CoverLetterViewer 
+              coverLetterData={coverLetterData} 
+              cvData={cvData}
+              onUpdateText={(newText) => {
+                if (coverLetterData) {
+                  setCoverLetterData({ ...coverLetterData, text: newText });
+                }
+              }}
+            />
           )}
         </div>
       </div>
